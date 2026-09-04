@@ -19,8 +19,10 @@ var SHEET_SETARI = "Setari";
 var DISCUTII_HEADERS = [
   "Znacznik czasu", "Data rozmowy", "Agent", "Dealer / Firma", "Osoba kontaktowa",
   "Telefon", "Email", "Wojewodztwo", "Miasto", "Status rozmowy", "Potencjal",
-  "Kolejne dzialanie", "Data kolejnego dzialania", "Uwagi",
+  "Kolejne dzialanie", "Data kolejnego dzialania", "Uwagi", "Powod ukrycia",
 ];
+var COL_HIDE_REASON = DISCUTII_HEADERS.length; // 15 - ultima coloana (O): completata cand un dealer e "sters" din aplicatie
+var DEFAULT_HIDE_REASON = "Negocjacje nieudane"; // "negociere esuata"
 
 var PUNKTY_HEADERS = [
   "Znacznik czasu", "Dealer", "Miasto", "Wojewodztwo", "Adres", "Telefon", "Agent", "Uwagi",
@@ -50,6 +52,13 @@ function setupSheets() {
     discSheet.getRange(1, 1, 1, DISCUTII_HEADERS.length).setValues([DISCUTII_HEADERS]);
     discSheet.setFrozenRows(1);
     discSheet.getRange(1, 1, 1, DISCUTII_HEADERS.length).setFontWeight("bold");
+  } else {
+    // Migrare: daca Sheet-ul a fost creat inainte de coloana "Powod ukrycia", o adaugam acum
+    // fara sa atingem datele existente.
+    var existingHeader = discSheet.getRange(1, COL_HIDE_REASON).getValue();
+    if (String(existingHeader || "").trim() !== "Powod ukrycia") {
+      discSheet.getRange(1, COL_HIDE_REASON).setValue("Powod ukrycia").setFontWeight("bold");
+    }
   }
 
   var punktySheet = ss.getSheetByName(SHEET_PUNCTE) || ss.insertSheet(SHEET_PUNCTE);
@@ -100,7 +109,7 @@ function doGet(e) {
   if (action === "report") return outResult({ ok: true, data: buildReport() }, callback);
   if (action === "dealeri") return outResult({ ok: true, dealeri: readDealerIndex() }, callback);
 
-  if (action === "add" || action === "update" || action === "addpunct") {
+  if (action === "add" || action === "update" || action === "addpunct" || action === "hide") {
     var entry;
     try {
       entry = JSON.parse(e.parameter.payload || "{}");
@@ -110,7 +119,8 @@ function doGet(e) {
     var result;
     if (action === "add") result = processAdd(entry);
     else if (action === "update") result = processUpdate(entry);
-    else result = processAddPunct(entry);
+    else if (action === "addpunct") result = processAddPunct(entry);
+    else result = processHide(entry);
     return outResult(result, callback);
   }
 
@@ -121,7 +131,7 @@ function doGet(e) {
 function doPost(e) {
   var action = (e.parameter.action || "add").toLowerCase();
   if (!checkToken(e.parameter.token)) return jsonOut({ ok: false, error: "token invalid" });
-  if (["add", "update", "addpunct"].indexOf(action) === -1) {
+  if (["add", "update", "addpunct", "hide"].indexOf(action) === -1) {
     return jsonOut({ ok: false, error: "actiune necunoscuta" });
   }
 
@@ -134,7 +144,30 @@ function doPost(e) {
 
   if (action === "add") return jsonOut(processAdd(entry));
   if (action === "update") return jsonOut(processUpdate(entry));
-  return jsonOut(processAddPunct(entry));
+  if (action === "addpunct") return jsonOut(processAddPunct(entry));
+  return jsonOut(processHide(entry));
+}
+
+// "Sterge" un dealer din aplicatie: NU se sterge randul din Sheet (ramane pentru evidenta),
+// doar se completeaza coloana "Powod ukrycia" - rândul dispare din raport, din harta si din
+// verificarea de duplicate, dar poate fi recuperat oricand stergand manual acea celula in Sheet.
+function processHide(entry) {
+  var key = normalizeDealer(entry.dealer);
+  if (!key) return { ok: false, error: "dealer lipsa" };
+
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_DISCUTII);
+  var lastRow = sheet ? sheet.getLastRow() : 0;
+  if (lastRow < 2) return { ok: false, error: "discutie negasita" };
+
+  var dealerCol = sheet.getRange(2, 4, lastRow - 1, 1).getValues(); // Dealer (D)
+  for (var i = 0; i < dealerCol.length; i++) {
+    if (normalizeDealer(dealerCol[i][0]) === key) {
+      var row = i + 2;
+      sheet.getRange(row, COL_HIDE_REASON).setValue(entry.reason || DEFAULT_HIDE_REASON);
+      return { ok: true };
+    }
+  }
+  return { ok: false, error: "discutie negasita" };
 }
 
 function processAdd(entry) {
@@ -286,33 +319,36 @@ function normalizeDealer(s) {
     .trim();
 }
 
-// Returneaza {agent, data} daca dealerul a mai fost introdus, altfel null.
+// Returneaza {agent, data} daca dealerul a mai fost introdus (si nu e ascuns/sters), altfel null.
 function findDuplicateDealer(dealerName) {
   var target = normalizeDealer(dealerName);
   if (!target) return null;
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_DISCUTII);
   var lastRow = sheet ? sheet.getLastRow() : 0;
   if (lastRow < 2) return null;
-  var values = sheet.getRange(2, 2, lastRow - 1, 3).getValues(); // Data(B), Agent(C), Dealer(D)
+  var values = sheet.getRange(2, 2, lastRow - 1, COL_HIDE_REASON - 1).getValues(); // B..O: Data(0) Agent(1) Dealer(2) ... Powod ukrycia(12)
   for (var i = 0; i < values.length; i++) {
     var rowDealer = values[i][2];
-    if (rowDealer && normalizeDealer(rowDealer) === target) {
+    var hidden = String(values[i][COL_HIDE_REASON - 2] || "").trim(); // ultima coloana din range
+    if (rowDealer && !hidden && normalizeDealer(rowDealer) === target) {
       return { agent: String(values[i][1] || ""), data: fmtDate(values[i][0]) };
     }
   }
   return null;
 }
 
-// Lista usoara (dealer, agent, data) pentru verificare instantanee in aplicatie.
+// Lista usoara (dealer, agent, data) pentru verificare instantanee in aplicatie - exclude dealerii ascunsi/stersi.
 function readDealerIndex() {
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_DISCUTII);
   var lastRow = sheet ? sheet.getLastRow() : 0;
   if (lastRow < 2) return [];
-  var values = sheet.getRange(2, 2, lastRow - 1, 3).getValues(); // Data(B), Agent(C), Dealer(D)
+  var values = sheet.getRange(2, 2, lastRow - 1, COL_HIDE_REASON - 1).getValues(); // B..O
   var out = [];
   for (var i = 0; i < values.length; i++) {
     var dealer = values[i][2];
     if (!String(dealer || "").trim()) continue;
+    var hidden = String(values[i][COL_HIDE_REASON - 2] || "").trim();
+    if (hidden) continue;
     out.push({ dealer: String(dealer), agent: String(values[i][1] || ""), data: fmtDate(values[i][0]) });
   }
   return out;
@@ -327,11 +363,16 @@ function buildReport() {
   var meta = readMeta();
 
   var rows = [];
+  var hiddenDealers = {}; // dealeri "stersi" din aplicatie (randul ramane in Sheet, dar iese din raport/harta)
   var lastRow = dateSheet ? dateSheet.getLastRow() : 0;
   if (lastRow >= 2) {
     var values = dateSheet.getRange(2, 1, lastRow - 1, DISCUTII_HEADERS.length).getValues();
     values.forEach(function (r) {
       if (!String(r[3] || "").trim()) return; // skip rows without dealer
+      if (String(r[14] || "").trim()) { // ascuns (Powod ukrycia completat) - nu intra in raport
+        hiddenDealers[normalizeDealer(r[3])] = true;
+        return;
+      }
       rows.push({
         data: r[1], agent: String(r[2] || ""), dealer: String(r[3] || ""),
         contact: String(r[4] || ""), telefon: String(r[5] || ""), email: String(r[6] || ""),
@@ -404,6 +445,7 @@ function buildReport() {
     var valuesP = puncteSheet.getRange(2, 1, lastRowP - 1, PUNKTY_HEADERS.length).getValues();
     valuesP.forEach(function (r) {
       if (!String(r[1] || "").trim()) return; // skip rows without dealer
+      if (hiddenDealers[normalizeDealer(r[1])]) return; // dealerul central e ascuns/sters - ascundem si punctele lui
       puncte.push({
         dealer: String(r[1] || ""), oras: String(r[2] || ""), judet: String(r[3] || ""),
         adresa: String(r[4] || ""), telefon: String(r[5] || ""), agent: String(r[6] || ""),

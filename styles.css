@@ -3,6 +3,7 @@
   --brand: #c1501a;
   --brand-light: #e8672c;
   --brand-wash: rgba(232,103,44,0.12);
+  --navy: #1F3864;
   --surface-1: #fcfcfb;
   --page: #f9f9f7;
   --text-primary: #0b0b0b;
@@ -33,9 +34,9 @@ body {
 }
 
 .app-header {
-  background: var(--surface-1);
-  border-bottom: 1px solid var(--border);
-  color: var(--text-primary);
+  background: var(--navy);
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  color: #fff;
   padding: calc(env(safe-area-inset-top, 0px) + 14px) 16px 12px 16px;
   position: sticky;
   top: 0;
@@ -46,17 +47,9 @@ body {
   gap: 12px;
   flex-wrap: wrap;
 }
-.app-header-brand { min-width: 0; display: flex; align-items: center; gap: 10px; }
-.brand-logo { height: 32px; width: auto; display: block; }
-.foton-badge {
-  display: inline-flex;
-  align-items: center;
-  background: #1F3864;
-  border-radius: 8px;
-  padding: 5px 10px;
-  flex-shrink: 0;
-}
-.foton-badge img { height: 16px; width: auto; display: block; }
+.app-header-brand { min-width: 0; display: flex; align-items: center; gap: 12px; }
+.brand-logo { height: 28px; width: auto; display: block; }
+.foton-logo { height: 20px; width: auto; display: block; }
 .app-header-right {
   display: flex;
   align-items: center;
@@ -67,14 +60,14 @@ body {
 
 .lang-switch {
   display: flex;
-  border: 1px solid var(--gridline);
+  border: 1px solid rgba(255,255,255,0.30);
   border-radius: 999px;
   overflow: hidden;
 }
 .lang-btn {
   border: none;
-  background: var(--surface-1);
-  color: var(--text-secondary);
+  background: transparent;
+  color: rgba(255,255,255,0.75);
   font-size: 12px;
   font-weight: 700;
   padding: 5px 11px;
@@ -84,8 +77,8 @@ body {
 
 .app-header-sub {
   font-size: 12px;
-  color: #a0490f;
-  background: var(--brand-wash);
+  color: var(--brand);
+  background: #fff3ec;
   display: inline-block;
   padding: 3px 9px;
   border-radius: 999px;
@@ -357,6 +350,19 @@ input[readonly] { background: var(--gridline); color: var(--text-secondary); }
   cursor: pointer;
 }
 .btn-edit:active { background: var(--brand-wash); }
+.discutie-item .d-actions { display: flex; gap: 8px; }
+.btn-delete {
+  background: none;
+  border: 1px solid rgba(208,59,59,0.45);
+  color: var(--critical);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 5px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.btn-delete:active { background: rgba(208,59,59,0.10); }
+.btn-delete:disabled { opacity: 0.5; }
 
 .status-pill {
   font-size: 11px;

@@ -38,6 +38,9 @@
       fNextDate: "Data kolejnego dzialania", fNotes: "Uwagi",
       fNotesPh: "Istotne szczegoly z rozmowy...",
       saveBtn: "Zapisz rozmowe", updateBtn: "Aktualizuj rozmowe", editBtn: "Edytuj / uzupelnij",
+      deleteBtn: "Usun", confirmDeletePrefix: "Usunac dealera \"", confirmDeleteSuffix: "\" z aplikacji? Wpis pozostanie w arkuszu Google (oznaczony jako nieudany), ale zniknie z raportu i mapy.",
+      deleteError: "Nie udalo sie usunac (dealer nie zostal znaleziony). Odswiez raport i sprobuj ponownie.",
+      deleteOffline: "Brak polaczenia - nie udalo sie usunac. Sprobuj ponownie, gdy bedziesz online.",
       pointsAddHeading: "Dodaj punkt", pointsAddIntro: "Jesli dealer ma dodatkowe miejsca dzialalnosci oprocz siedziby glownej, dodaj je tutaj.",
       pDealerPh: "Wpisz lub wybierz istniejacego dealera", pAddress: "Adres",
       pAddressPh: "np. ul. Przykladowa 12", pSaveBtn: "Zapisz punkt",
@@ -89,6 +92,9 @@
       fNextDate: "Next action date", fNotes: "Notes",
       fNotesPh: "Relevant details from the discussion...",
       saveBtn: "Save discussion", updateBtn: "Update discussion", editBtn: "Edit / complete",
+      deleteBtn: "Delete", confirmDeletePrefix: "Delete dealer \"", confirmDeleteSuffix: "\" from the app? The row will stay in the Google Sheet (marked as failed), but will disappear from the report and map.",
+      deleteError: "Could not delete (dealer not found). Refresh the report and try again.",
+      deleteOffline: "No connection - could not delete. Try again once you're online.",
       pointsAddHeading: "Add a point", pointsAddIntro: "If a dealer has extra locations besides its head office, add them here.",
       pDealerPh: "Type or pick an existing dealer", pAddress: "Address",
       pAddressPh: "e.g. 12 Example St", pSaveBtn: "Save point",
@@ -807,6 +813,31 @@
     return "neutral";
   }
 
+  // "Sterge" un dealer din aplicatie: randul NU se sterge din Sheet (ramane pentru evidenta,
+  // cu "Negocjacje nieudane" notat pe coloana dedicata), doar dispare din raport/lista/harta.
+  function handleDeleteDealer(record, btn) {
+    if (!window.confirm(T("confirmDeletePrefix") + record.dealer + T("confirmDeleteSuffix"))) return;
+    if (!isConfigured()) {
+      alert(T("msgNotConfigured"));
+      return;
+    }
+    if (btn) btn.disabled = true;
+    jsonpRequest({ action: "hide", token: CONFIG.APP_TOKEN, payload: JSON.stringify({ dealer: record.dealer }) })
+      .then(function (res) {
+        if (btn) btn.disabled = false;
+        if (res && res.ok) {
+          loadReport(true);
+          loadDealerIndex();
+        } else {
+          alert(T("deleteError"));
+        }
+      })
+      .catch(function () {
+        if (btn) btn.disabled = false;
+        alert(T("deleteOffline"));
+      });
+  }
+
   function renderAllList(list) {
     var el = $("allDiscutiiList");
     el.innerHTML = "";
@@ -825,7 +856,9 @@
         (r.nextAction ? '<div class="d-next">' + escapeHtml(r.nextAction) +
           (r.nextActionDate ? " (" + escapeHtml(r.nextActionDate) + ")" : "") + '</div>' : "") +
         '<div class="d-actions"><button type="button" class="btn-edit" data-key="' +
-          escapeHtml(normalizeDealerJS(r.dealer)) + '">' + escapeHtml(T("editBtn")) + '</button></div>';
+          escapeHtml(normalizeDealerJS(r.dealer)) + '">' + escapeHtml(T("editBtn")) + '</button>' +
+          '<button type="button" class="btn-delete" data-key="' +
+          escapeHtml(normalizeDealerJS(r.dealer)) + '">' + escapeHtml(T("deleteBtn")) + '</button></div>';
       el.appendChild(item);
     });
   }
@@ -1016,14 +1049,25 @@
       showMsg(T("editCancelled"), "pending");
     });
     $("allDiscutiiList").addEventListener("click", function (evt) {
-      var btn = evt.target.closest ? evt.target.closest(".btn-edit") : null;
-      if (!btn) return;
-      var key = btn.getAttribute("data-key");
-      var record = null;
-      for (var i = 0; i < lastDiscutii.length; i++) {
-        if (normalizeDealerJS(lastDiscutii[i].dealer) === key) { record = lastDiscutii[i]; break; }
+      var editBtn = evt.target.closest ? evt.target.closest(".btn-edit") : null;
+      if (editBtn) {
+        var key = editBtn.getAttribute("data-key");
+        var record = null;
+        for (var i = 0; i < lastDiscutii.length; i++) {
+          if (normalizeDealerJS(lastDiscutii[i].dealer) === key) { record = lastDiscutii[i]; break; }
+        }
+        if (record) enterEditMode(record);
+        return;
       }
-      if (record) enterEditMode(record);
+      var delBtn = evt.target.closest ? evt.target.closest(".btn-delete") : null;
+      if (delBtn) {
+        var delKey = delBtn.getAttribute("data-key");
+        var delRecord = null;
+        for (var j = 0; j < lastDiscutii.length; j++) {
+          if (normalizeDealerJS(lastDiscutii[j].dealer) === delKey) { delRecord = lastDiscutii[j]; break; }
+        }
+        if (delRecord) handleDeleteDealer(delRecord, delBtn);
+      }
     });
 
     $("punktForm").addEventListener("submit", handlePunctSubmit);
