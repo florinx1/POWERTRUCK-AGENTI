@@ -1,4 +1,4 @@
-var CACHE_NAME = "powertruck-v1";
+var CACHE_NAME = "powertruck-v2";
 var APP_SHELL = [
   "./",
   "./index.html",
@@ -9,6 +9,7 @@ var APP_SHELL = [
   "./icons/icon-192.png",
   "./icons/icon-512.png",
   "./icons/brand/powertruck.png",
+  "./icons/brand/foton.png",
   "./lib/leaflet/leaflet.js",
   "./lib/leaflet/leaflet.css",
   "./lib/leaflet/images/marker-icon.png",

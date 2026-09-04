@@ -84,16 +84,40 @@ function writeColumn(sheet, col, values) {
 // ---------------------------------------------------------------------------
 // HTTP ENTRY POINTS
 // ---------------------------------------------------------------------------
+// NOTA CORS: aplicatia (gazduita pe github.io) NU poate citi raspunsul lui
+// script.google.com printr-un fetch() POST/GET obisnuit - Google nu trimite
+// anteturile CORS necesare pentru domenii straine. Solutia: TOATE cererile
+// (inclusiv salvarile) vin ca GET cu parametrul "callback" (tehnica JSONP,
+// care ocoleste complet CORS pentru ca foloseste un <script src="..."> in loc
+// de fetch). doPost() ramane mai jos doar ca rezerva / pentru testare manuala.
 function doGet(e) {
   var action = (e.parameter.action || "").toLowerCase();
-  if (!checkToken(e.parameter.token)) return jsonOut({ ok: false, error: "token invalid" });
+  var callback = e.parameter.callback || "";
 
-  if (action === "meta") return jsonOut({ ok: true, meta: readMeta() });
-  if (action === "report") return jsonOut({ ok: true, data: buildReport() });
-  if (action === "dealeri") return jsonOut({ ok: true, dealeri: readDealerIndex() });
-  return jsonOut({ ok: true, message: "PowerTruck API active. Use ?action=meta, ?action=report or ?action=dealeri." });
+  if (!checkToken(e.parameter.token)) return outResult({ ok: false, error: "token invalid" }, callback);
+
+  if (action === "meta") return outResult({ ok: true, meta: readMeta() }, callback);
+  if (action === "report") return outResult({ ok: true, data: buildReport() }, callback);
+  if (action === "dealeri") return outResult({ ok: true, dealeri: readDealerIndex() }, callback);
+
+  if (action === "add" || action === "update" || action === "addpunct") {
+    var entry;
+    try {
+      entry = JSON.parse(e.parameter.payload || "{}");
+    } catch (err) {
+      return outResult({ ok: false, error: "corp cerere invalid" }, callback);
+    }
+    var result;
+    if (action === "add") result = processAdd(entry);
+    else if (action === "update") result = processUpdate(entry);
+    else result = processAddPunct(entry);
+    return outResult(result, callback);
+  }
+
+  return outResult({ ok: true, message: "PowerTruck API active. Use ?action=meta, ?action=report or ?action=dealeri." }, callback);
 }
 
+// Rezerva / testare manuala (nu mai este folosita de aplicatie - vezi nota CORS de mai sus).
 function doPost(e) {
   var action = (e.parameter.action || "add").toLowerCase();
   if (!checkToken(e.parameter.token)) return jsonOut({ ok: false, error: "token invalid" });
@@ -108,21 +132,21 @@ function doPost(e) {
     return jsonOut({ ok: false, error: "corp cerere invalid" });
   }
 
-  if (action === "addpunct") return handleAddPunct(entry);
+  if (action === "add") return jsonOut(processAdd(entry));
+  if (action === "update") return jsonOut(processUpdate(entry));
+  return jsonOut(processAddPunct(entry));
+}
 
+function processAdd(entry) {
   if (!entry.agent || !entry.dealer || !entry.judet || !entry.status || !entry.data) {
-    return jsonOut({ ok: false, error: "campuri obligatorii lipsa" });
+    return { ok: false, error: "campuri obligatorii lipsa" };
   }
-
-  if (action === "update") return handleUpdate(entry);
-
   var dup = findDuplicateDealer(entry.dealer);
   if (dup) {
-    return jsonOut({ ok: false, error: "duplicate", agent: dup.agent, data: dup.data });
+    return { ok: false, error: "duplicate", agent: dup.agent, data: dup.data };
   }
-
   appendEntryRow(entry);
-  return jsonOut({ ok: true });
+  return { ok: true };
 }
 
 function appendEntryRow(entry) {
@@ -147,13 +171,13 @@ function appendEntryRow(entry) {
 
 // Actualizeaza randul existent al unui dealer (identificat dupa numele dealerului,
 // care ramane blocat/needitabil in aplicatie cat timp o discutie e in editare).
-function handleUpdate(entry) {
+function processUpdate(entry) {
   var key = normalizeDealer(entry.dealer);
-  if (!key) return jsonOut({ ok: false, error: "dealer lipsa pentru actualizare" });
+  if (!key) return { ok: false, error: "dealer lipsa pentru actualizare" };
 
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_DISCUTII);
   var lastRow = sheet ? sheet.getLastRow() : 0;
-  if (lastRow < 2) return jsonOut({ ok: false, error: "discutie negasita" });
+  if (lastRow < 2) return { ok: false, error: "discutie negasita" };
 
   var dealerCol = sheet.getRange(2, 4, lastRow - 1, 1).getValues(); // Dealer (D)
   for (var i = 0; i < dealerCol.length; i++) {
@@ -174,17 +198,17 @@ function handleUpdate(entry) {
         entry.nextActionDate || "",
         entry.observatii || "",
       ]]);
-      return jsonOut({ ok: true, updated: true });
+      return { ok: true, updated: true };
     }
   }
-  return jsonOut({ ok: false, error: "discutie negasita" });
+  return { ok: false, error: "discutie negasita" };
 }
 
 // Adauga un punct de lucru suplimentar pentru un dealer deja existent (sediu central
 // intr-un oras, dar cu puncte si in alte orase/wojewodztwa).
-function handleAddPunct(entry) {
+function processAddPunct(entry) {
   if (!entry.dealer || !entry.oras || !entry.judet) {
-    return jsonOut({ ok: false, error: "campuri obligatorii lipsa" });
+    return { ok: false, error: "campuri obligatorii lipsa" };
   }
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_PUNCTE);
   sheet.appendRow([
@@ -197,7 +221,7 @@ function handleAddPunct(entry) {
     entry.agent || "",
     entry.observatii || "",
   ]);
-  return jsonOut({ ok: true });
+  return { ok: true };
 }
 
 function checkToken(token) {
@@ -206,6 +230,18 @@ function checkToken(token) {
 
 function jsonOut(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
+}
+
+// Raspuns JSONP: aplicatia cere datele printr-un tag <script>, nu printr-un
+// fetch() - asa ocolim CORS. Daca nu vine "callback" (ex. test manual din
+// browser, ca ?action=meta&token=...), raspundem simplu, ca JSON normal.
+function outResult(obj, callback) {
+  if (callback) {
+    return ContentService
+      .createTextOutput(callback + "(" + JSON.stringify(obj) + ")")
+      .setMimeType(ContentService.MimeType.JAVASCRIPT);
+  }
+  return jsonOut(obj);
 }
 
 // ---------------------------------------------------------------------------

@@ -279,6 +279,47 @@
   }
 
   // ---------------------------------------------------------------------
+  // JSONP - Google Apps Script (script.google.com) nu trimite anteturile CORS
+  // necesare pentru ca fetch() sa citeasca raspunsul de pe alt domeniu
+  // (github.io). Solutie: cerem datele printr-un tag <script src="...">, care
+  // nu e supus regulilor CORS - tehnica JSONP, folosita si pentru salvari
+  // (trimise ca GET cu parametrul "payload"), nu doar pentru citire.
+  // ---------------------------------------------------------------------
+  var jsonpCounter = 0;
+  function extendParams(base, extra) {
+    var out = {};
+    Object.keys(base).forEach(function (k) { out[k] = base[k]; });
+    Object.keys(extra).forEach(function (k) { out[k] = extra[k]; });
+    return out;
+  }
+  function jsonpRequest(params, timeoutMs) {
+    return new Promise(function (resolve, reject) {
+      var cbName = "ptcb_" + Date.now() + "_" + (jsonpCounter++);
+      var script = document.createElement("script");
+      var timer = null;
+      function cleanup() {
+        delete window[cbName];
+        if (script.parentNode) script.parentNode.removeChild(script);
+        if (timer) clearTimeout(timer);
+      }
+      window[cbName] = function (data) {
+        cleanup();
+        resolve(data);
+      };
+      script.src = apiUrl(extendParams(params, { callback: cbName }));
+      script.onerror = function () {
+        cleanup();
+        reject(new Error("network"));
+      };
+      timer = setTimeout(function () {
+        cleanup();
+        reject(new Error("timeout"));
+      }, timeoutMs || 15000);
+      document.head.appendChild(script);
+    });
+  }
+
+  // ---------------------------------------------------------------------
   // I18N apply + language switch
   // ---------------------------------------------------------------------
   function applyStaticText() {
@@ -333,8 +374,7 @@
     applyMeta(cached ? JSON.parse(cached) : DEFAULT_META);
 
     if (!isConfigured()) return;
-    fetch(apiUrl({ action: "meta", token: CONFIG.APP_TOKEN }))
-      .then(function (r) { return r.json(); })
+    jsonpRequest({ action: "meta", token: CONFIG.APP_TOKEN })
       .then(function (data) {
         if (data && data.ok && data.meta) {
           localStorage.setItem(CACHE_META_KEY, JSON.stringify(data.meta));
@@ -351,8 +391,7 @@
     }
     refreshDealerDatalist();
     if (!isConfigured()) return;
-    fetch(apiUrl({ action: "dealeri", token: CONFIG.APP_TOKEN }))
-      .then(function (r) { return r.json(); })
+    jsonpRequest({ action: "dealeri", token: CONFIG.APP_TOKEN })
       .then(function (data) {
         if (data && data.ok && data.dealeri) {
           dealerIndex = data.dealeri;
@@ -447,11 +486,7 @@
   }
 
   function sendEntry(entry, action) {
-    return fetch(apiUrl({ action: action || "add", token: CONFIG.APP_TOKEN }), {
-      method: "POST",
-      headers: { "Content-Type": "text/plain;charset=utf-8" }, // avoids CORS preflight to Apps Script
-      body: JSON.stringify(entry),
-    }).then(function (r) { return r.json(); });
+    return jsonpRequest({ action: action || "add", token: CONFIG.APP_TOKEN, payload: JSON.stringify(entry) });
   }
 
   function flushQueue() {
@@ -622,11 +657,7 @@
       return;
     }
 
-    fetch(apiUrl({ action: "addpunct", token: CONFIG.APP_TOKEN }), {
-      method: "POST",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify(entry),
-    }).then(function (r) { return r.json(); }).then(function (res) {
+    jsonpRequest({ action: "addpunct", token: CONFIG.APP_TOKEN, payload: JSON.stringify(entry) }).then(function (res) {
       btn.disabled = false;
       if (res && res.ok) {
         lastPuncte.push({
@@ -654,11 +685,7 @@
     var chain = Promise.resolve();
     q.forEach(function (entry) {
       chain = chain.then(function () {
-        return fetch(apiUrl({ action: "addpunct", token: CONFIG.APP_TOKEN }), {
-          method: "POST",
-          headers: { "Content-Type": "text/plain;charset=utf-8" },
-          body: JSON.stringify(entry),
-        }).then(function (r) { return r.json(); }).then(function (res) {
+        return jsonpRequest({ action: "addpunct", token: CONFIG.APP_TOKEN, payload: JSON.stringify(entry) }).then(function (res) {
           if (!res || !res.ok) remaining.push(entry);
         }).catch(function () { remaining.push(entry); });
       });
@@ -836,8 +863,7 @@
       if (!cached) $("reportUpdated").textContent = "";
       return;
     }
-    fetch(apiUrl({ action: "report", token: CONFIG.APP_TOKEN }))
-      .then(function (r) { return r.json(); })
+    jsonpRequest({ action: "report", token: CONFIG.APP_TOKEN })
       .then(function (res) {
         if (!res || !res.ok) throw new Error("raspuns invalid");
         renderReport(res.data);
