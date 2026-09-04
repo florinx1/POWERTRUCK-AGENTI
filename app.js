@@ -1037,7 +1037,6 @@
     applyStaticText();
     loadMeta();
     loadDealerIndex();
-    loadReport(false);
     updateOfflineBadge();
 
     $("entryForm").addEventListener("submit", handleSubmit);
