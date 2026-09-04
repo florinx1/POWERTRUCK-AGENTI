@@ -826,6 +826,16 @@
       .then(function (res) {
         if (btn) btn.disabled = false;
         if (res && res.ok) {
+          // Actualizare instant, locala: scoatem dealerul din listele deja incarcate,
+          // fara sa mai asteptam un round-trip nou catre Apps Script.
+          var key = normalizeDealerJS(record.dealer);
+          lastDiscutii = lastDiscutii.filter(function (r) { return normalizeDealerJS(r.dealer) !== key; });
+          lastDiscutiiTotal = Math.max(0, lastDiscutiiTotal - 1);
+          lastPuncte = lastPuncte.filter(function (p) { return normalizeDealerJS(p.dealer) !== key; });
+          applyListFilter();
+          renderDealerMap(lastDiscutii, lastPuncte);
+          renderPointsList();
+          // KPI-urile si agregatele se resincronizeaza pe fundal, fara sa blocheze UI-ul.
           loadReport(true);
           loadDealerIndex();
         } else {
