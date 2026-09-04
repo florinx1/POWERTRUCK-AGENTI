@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>PowerTruck Poland</title>
+<meta name="theme-color" content="#ffffff" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="PowerTruck" />
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="apple-touch-icon" href="icons/icon-192.png" />
+<link rel="icon" href="icons/icon-192.png" />
+<link rel="stylesheet" href="lib/leaflet/leaflet.css" />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body class="viz-root">
+
+<header class="app-header">
+  <div class="app-header-brand">
+    <img src="icons/brand/powertruck.png" alt="PowerTruck" class="brand-logo" />
+  </div>
+  <div class="app-header-right">
+    <div class="lang-switch" id="langSwitch">
+      <button type="button" class="lang-btn" data-lang="pl">PL</button>
+      <button type="button" class="lang-btn" data-lang="en">EN</button>
+    </div>
+    <div class="app-header-sub" id="offlineBadge" hidden data-i18n="offlineBadge"></div>
+  </div>
+</header>
+
+<main id="view-form" class="view">
+  <div id="editBanner" class="edit-banner" hidden>
+    <span id="editBannerText"></span>
+    <button type="button" id="cancelEditBtn" class="btn-secondary" data-i18n="cancel"></button>
+  </div>
+  <form id="entryForm" autocomplete="off">
+    <div class="field">
+      <label for="f_agent" data-i18n="fAgent"></label>
+      <select id="f_agent" required></select>
+    </div>
+
+    <div class="field">
+      <label for="f_date" data-i18n="fDate"></label>
+      <input type="date" id="f_date" required />
+    </div>
+
+    <div class="field">
+      <label for="f_dealer" data-i18n="fDealer"></label>
+      <input type="text" id="f_dealer" data-i18n-placeholder="fDealerPh" required />
+      <div id="dealerWarning" class="dealer-warning" hidden></div>
+    </div>
+
+    <div class="field-row">
+      <div class="field">
+        <label for="f_contact" data-i18n="fContact"></label>
+        <input type="text" id="f_contact" data-i18n-placeholder="fContactPh" />
+      </div>
+      <div class="field">
+        <label for="f_telefon" data-i18n="fPhone"></label>
+        <input type="tel" id="f_telefon" placeholder="+48 xxx xxx xxx" />
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="f_email" data-i18n="fEmail"></label>
+      <input type="email" id="f_email" placeholder="nazwa@firma.pl" />
+    </div>
+
+    <div class="field-row">
+      <div class="field">
+        <label for="f_judet" data-i18n="fRegion"></label>
+        <select id="f_judet" required></select>
+      </div>
+      <div class="field">
+        <label for="f_localitate" data-i18n="fCity"></label>
+        <input type="text" id="f_localitate" data-i18n-placeholder="fCityPh" />
+      </div>
+    </div>
+
+    <div class="field-row">
+      <div class="field">
+        <label for="f_status" data-i18n="fStatus"></label>
+        <select id="f_status" required></select>
+      </div>
+      <div class="field">
+        <label for="f_potential" data-i18n="fPotential"></label>
+        <select id="f_potential"></select>
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="f_next_action" data-i18n="fNextAction"></label>
+      <input type="text" id="f_next_action" data-i18n-placeholder="fNextActionPh" />
+    </div>
+
+    <div class="field">
+      <label for="f_next_date" data-i18n="fNextDate"></label>
+      <input type="date" id="f_next_date" />
+    </div>
+
+    <div class="field">
+      <label for="f_obs" data-i18n="fNotes"></label>
+      <textarea id="f_obs" rows="3" data-i18n-placeholder="fNotesPh"></textarea>
+    </div>
+
+    <button type="submit" class="btn-primary" id="submitBtn" data-i18n="saveBtn"></button>
+    <div id="formMsg" class="form-msg" role="status" aria-live="polite"></div>
+  </form>
+</main>
+
+<main id="view-points" class="view" hidden>
+  <section class="card">
+    <h2 data-i18n="pointsAddHeading"></h2>
+    <p class="muted-text" data-i18n="pointsAddIntro" style="margin:0 0 12px;"></p>
+    <form id="punktForm" autocomplete="off">
+      <div class="field">
+        <label for="p_dealer" data-i18n="fDealer"></label>
+        <input type="text" id="p_dealer" list="dealerList" data-i18n-placeholder="pDealerPh" required />
+        <datalist id="dealerList"></datalist>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="p_oras" data-i18n="fCity"></label>
+          <input type="text" id="p_oras" data-i18n-placeholder="fCityPh" required />
+        </div>
+        <div class="field">
+          <label for="p_judet" data-i18n="fRegion"></label>
+          <select id="p_judet" required></select>
+        </div>
+      </div>
+      <div class="field">
+        <label for="p_adresa" data-i18n="pAddress"></label>
+        <input type="text" id="p_adresa" data-i18n-placeholder="pAddressPh" />
+      </div>
+      <div class="field">
+        <label for="p_telefon" data-i18n="fPhone"></label>
+        <input type="tel" id="p_telefon" placeholder="+48 xxx xxx xxx" />
+      </div>
+      <div class="field">
+        <label for="p_obs" data-i18n="fNotes"></label>
+        <textarea id="p_obs" rows="2" data-i18n-placeholder="fNotesPh"></textarea>
+      </div>
+      <button type="submit" class="btn-primary" id="punktSubmitBtn" data-i18n="pSaveBtn"></button>
+      <div id="punktMsg" class="form-msg" role="status" aria-live="polite"></div>
+    </form>
+  </section>
+
+  <section class="card">
+    <h2 data-i18n="pointsListHeading"></h2>
+    <div id="pointsListNote" class="muted-text" style="margin-bottom:8px;"></div>
+    <div id="pointsList" class="restante-list"></div>
+  </section>
+</main>
+
+<main id="view-report" class="view" hidden>
+  <div class="report-toolbar">
+    <button id="refreshBtn" class="btn-secondary" type="button" data-i18n="refreshBtn"></button>
+    <span id="reportUpdated" class="muted-text"></span>
+  </div>
+
+  <section class="kpi-grid" id="kpiGrid" aria-label="KPI"></section>
+
+  <section class="card">
+    <h2 data-i18n="statusCardTitle"></h2>
+    <div id="statusBars" class="bar-list"></div>
+  </section>
+
+  <section class="card">
+    <h2 data-i18n="agentCardTitle"></h2>
+    <div id="agentBars" class="bar-list"></div>
+  </section>
+
+  <section class="card">
+    <h2 data-i18n="geoCardTitle"></h2>
+    <div id="geoBars" class="bar-list"></div>
+  </section>
+
+  <section class="card">
+    <h2 data-i18n="mapCardTitle"></h2>
+    <div id="mapNote" class="muted-text" style="margin-bottom:8px;"></div>
+    <div id="dealerMap" class="dealer-map"></div>
+    <div id="mapLegend" class="map-legend"></div>
+  </section>
+
+  <section class="card">
+    <h2 data-i18n="restanteCardTitle"></h2>
+    <div id="restanteList" class="restante-list"></div>
+  </section>
+
+  <section class="card">
+    <h2 data-i18n="allDiscutiiCardTitle"></h2>
+    <input type="search" id="searchInput" class="search-input" data-i18n-placeholder="searchPh" />
+    <div id="listNote" class="muted-text" style="margin-bottom:8px;"></div>
+    <div id="allDiscutiiList" class="restante-list"></div>
+  </section>
+</main>
+
+<nav class="tab-bar" aria-label="Navigation">
+  <button class="tab-btn active" id="tabFormBtn" type="button">
+    <span class="tab-icon" aria-hidden="true">+</span>
+    <span data-i18n="tabAdd"></span>
+  </button>
+  <button class="tab-btn" id="tabPointsBtn" type="button">
+    <span class="tab-icon" aria-hidden="true">o</span>
+    <span data-i18n="tabPoints"></span>
+  </button>
+  <button class="tab-btn" id="tabReportBtn" type="button">
+    <span class="tab-icon" aria-hidden="true">#</span>
+    <span data-i18n="tabReport"></span>
+  </button>
+</nav>
+
+<script src="lib/leaflet/leaflet.js"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
