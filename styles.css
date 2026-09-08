@@ -193,6 +193,7 @@ input[readonly] { background: var(--gridline); color: var(--text-secondary); }
 }
 .tab-btn .tab-icon { font-size: 18px; line-height: 1; font-weight: 700; }
 .tab-btn.active { color: var(--brand); }
+a.tab-btn { text-decoration: none; }
 
 /* ---- Report ---- */
 .report-toolbar {
