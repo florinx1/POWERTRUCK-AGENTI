@@ -194,6 +194,17 @@ input[readonly] { background: var(--gridline); color: var(--text-secondary); }
 .tab-btn .tab-icon { font-size: 18px; line-height: 1; font-weight: 700; }
 .tab-btn.active { color: var(--brand); }
 a.tab-btn { text-decoration: none; }
+/* Emoji nu respecta font-weight si au o cutie vizuala diferita de textul simplu
+   (+, o, #) folosit la celelalte iconite - le reducem si le centram explicit
+   ca sa se incadreze la fel de bine in bara de jos. */
+.tab-btn .tab-icon.icon-emoji {
+  font-size: 15px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 18px;
+}
 
 /* ---- Report ---- */
 .report-toolbar {
