@@ -1,4 +1,4 @@
-var CACHE_NAME = "powertruck-v4";
+var CACHE_NAME = "powertruck-v5";
 var APP_SHELL = [
   "./",
   "./index.html",
